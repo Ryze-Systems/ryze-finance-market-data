@@ -1,0 +1,31 @@
+name: Public 4h spot candles (manual research)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ryze-public-spot-ohlcv
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m unittest -q test_collector
+      - run: python collector.py --start 2024-01-01T00:00:00Z --end 2024-01-09T00:00:00Z --output out
+      - uses: actions/upload-artifact@v4
+        with:
+          name: public-spot-4h-sample
+          path: out/*
+          if-no-files-found: error
+          retention-days: 1
