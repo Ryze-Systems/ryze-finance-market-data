@@ -51,6 +51,17 @@ class CollectorTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 download("SOL-USD", 0, INTERVAL_MS, "coinbase")
 
+    def test_coinbase_inclusive_end_is_capped_to_avoid_301_bar_request(self):
+        import io
+        import json
+        rows = [{"start": str(at // 1000), "low": "9", "high": "12", "open": "10", "close": "11", "volume": "4"}
+                for at in (INTERVAL_MS, 2 * INTERVAL_MS)]
+        with patch("collector.urllib.request.urlopen", return_value=io.BytesIO(json.dumps({"candles": rows}).encode())) as request:
+            candles = download("BTC-USD", INTERVAL_MS, 3 * INTERVAL_MS, "coinbase")
+        self.assertEqual([row[0] for row in candles], [INTERVAL_MS, 2 * INTERVAL_MS])
+        self.assertIn(f"start={INTERVAL_MS // 1000}", request.call_args[0][0].full_url)
+        self.assertIn(f"end={2 * INTERVAL_MS // 1000}", request.call_args[0][0].full_url)
+
     def test_nonfinite_ohlcv_is_rejected(self):
         row = [0, "10", "inf", "9", "11", "5"]
         with self.assertRaises(ValueError):
