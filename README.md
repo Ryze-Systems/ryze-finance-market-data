@@ -8,6 +8,8 @@ The collector defaults to the unauthenticated Coinbase public API, retrieving 4-
 
 Offline tests: `python -m unittest -q test_collector`
 
+The manual GitHub workflow accepts an explicit UTC `start` and `end` (exclusive). It never schedules itself, never receives credentials, and retains the output artifact for one day. A completed workflow only establishes data availability; scientific eligibility additionally requires sufficiently long histories, a second independent feed, fees and walk-forward validation.
+
 Example manual run: `python collector.py --provider coinbase --start 2024-01-01T00:00:00Z --end 2024-01-09T00:00:00Z --output out`
 
 Cloud automation is staged in a draft PR. Do not enable recurring runs until the free runner execution, artifact retention and operational budget have been verified, and merge has been explicitly approved.

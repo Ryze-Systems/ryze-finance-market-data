@@ -1,4 +1,6 @@
 import unittest
+import tempfile
+from pathlib import Path
 from unittest.mock import patch
 
 from collector import INTERVAL_MS, as_ms, collect, download, validate
@@ -48,6 +50,21 @@ class CollectorTests(unittest.TestCase):
         with patch("collector.urllib.request.urlopen", return_value=io.BytesIO(b'{"message":"error"}')):
             with self.assertRaises(ValueError):
                 download("SOL-USD", 0, INTERVAL_MS, "coinbase")
+
+    def test_nonfinite_ohlcv_is_rejected(self):
+        row = [0, "10", "inf", "9", "11", "5"]
+        with self.assertRaises(ValueError):
+            validate([row], "BTC-USD", 0, INTERVAL_MS, "coinbase")
+
+    def test_immutable_output_idempotency_and_checksum(self):
+        row = [0, "10", "12", "9", "11", "100"]
+        with tempfile.TemporaryDirectory() as tmp, patch("collector.download", return_value=[row]):
+            output = Path(tmp)
+            first = collect("BTC-USD", 0, INTERVAL_MS, output, "coinbase")
+            self.assertEqual(first, collect("BTC-USD", 0, INTERVAL_MS, output, "coinbase"))
+            self.assertEqual(len(list(output.glob("*.jsonl"))), 1)
+            self.assertEqual(len(list(output.glob("*.sha256"))), 1)
+            self.assertIn('"provider":"coinbase"', first.read_text())
 
 
 if __name__ == "__main__":
