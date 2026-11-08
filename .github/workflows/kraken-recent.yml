@@ -1,0 +1,34 @@
+name: Kraken independent recent spot sample
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: kraken-recent-spot-sample
+  cancel-in-progress: false
+
+jobs:
+  recent-spot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Validate collector locally
+        run: python -m unittest discover -p 'test*.py' -q
+      - name: Fetch public Kraken 4h candles
+        run: python kraken_recent.py
+      - name: Publish immutable evidence (one day)
+        uses: actions/upload-artifact@v4
+        with:
+          name: kraken-independent-spot-4h
+          path: out/*
+          retention-days: 1
+          if-no-files-found: error
