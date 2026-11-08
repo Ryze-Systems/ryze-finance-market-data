@@ -2,6 +2,17 @@ name: Public 4h spot candles (manual research)
 
 on:
   workflow_dispatch:
+    inputs:
+      start:
+        description: UTC 4h-boundary start (inclusive)
+        required: true
+        default: '2024-01-01T00:00:00Z'
+        type: string
+      end:
+        description: UTC 4h-boundary end (exclusive)
+        required: true
+        default: '2024-01-09T00:00:00Z'
+        type: string
 
 permissions:
   contents: read
@@ -22,7 +33,11 @@ jobs:
         with:
           python-version: '3.11'
       - run: python -m unittest -q test_collector
-      - run: python collector.py --provider coinbase --start 2024-01-01T00:00:00Z --end 2024-01-09T00:00:00Z --output out
+      - name: Collect Coinbase public candles for specified closed interval
+        env:
+          START_UTC: ${{ inputs.start }}
+          END_UTC: ${{ inputs.end }}
+        run: python collector.py --provider coinbase --start "$START_UTC" --end "$END_UTC" --output out
       - uses: actions/upload-artifact@v4
         with:
           name: public-spot-4h-sample
