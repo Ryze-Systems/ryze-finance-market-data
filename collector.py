@@ -6,6 +6,7 @@ import argparse
 import datetime as dt
 import hashlib
 import json
+import math
 import pathlib
 import time
 import urllib.parse
@@ -40,7 +41,7 @@ def validate(rows: list, symbol: str, start_ms: int, end_ms: int, provider: str 
         if at != expected:
             raise ValueError(f"Gap or duplicate at {expected}: found {at}")
         o, h, l, c, v = map(float, candle[1:6])
-        if not (0 < l <= min(o, c) <= max(o, c) <= h and v >= 0):
+        if not all(map(math.isfinite, (o, h, l, c, v))) or not (0 < l <= min(o, c) <= max(o, c) <= h and v >= 0):
             raise ValueError("Inconsistent OHLCV")
         cleaned.append({"provider": provider, "symbol": symbol, "open_ms": at, "open": candle[1], "high": candle[2], "low": candle[3], "close": candle[4], "volume": candle[5]})
         expected += INTERVAL_MS
@@ -102,10 +103,21 @@ def collect(symbol: str, start_ms: int, end_ms: int, directory: pathlib.Path, pr
     directory.mkdir(parents=True, exist_ok=True)
     stem = f"{provider}-{symbol}-4h-{start_ms}-{end_ms}"
     target = directory / f"{stem}-{sha[:12]}.jsonl"
-    if target.exists() and target.read_bytes() != payload:
-        raise ValueError("Existing immutable data conflict")
-    target.write_bytes(payload)
-    (directory / f"{stem}-{sha[:12]}.sha256").write_text(f"{sha}  {target.name}\n")
+    if target.exists():
+        if target.read_bytes() != payload:
+            raise ValueError("Existing immutable data conflict")
+    else:
+        # Exclusive creation: a retry must never overwrite an existing dataset.
+        with target.open("xb") as stream:
+            stream.write(payload)
+    checksum_path = directory / f"{stem}-{sha[:12]}.sha256"
+    checksum_line = f"{sha}  {target.name}\n"
+    if checksum_path.exists():
+        if checksum_path.read_text() != checksum_line:
+            raise ValueError("Existing checksum conflict")
+    else:
+        with checksum_path.open("x") as stream:
+            stream.write(checksum_line)
     return target
 
 
