@@ -3,7 +3,7 @@ import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
-from collector import INTERVAL_MS, as_ms, collect, download, validate
+from collector import INTERVAL_MS, as_ms, collect, coverage_report, download, validate
 
 
 class CollectorTests(unittest.TestCase):
@@ -65,6 +65,24 @@ class CollectorTests(unittest.TestCase):
             self.assertEqual(len(list(output.glob("*.jsonl"))), 1)
             self.assertEqual(len(list(output.glob("*.sha256"))), 1)
             self.assertIn('"provider":"coinbase"', first.read_text())
+
+    def test_audit_reports_missing_first_and_internal_intervals(self):
+        candle = lambda at: [at, "10", "12", "9", "11", "100"]
+        report = coverage_report([candle(INTERVAL_MS), candle(3 * INTERVAL_MS)],
+                                 "BTC-USD", 0, 4 * INTERVAL_MS, "coinbase")
+        self.assertEqual(report["status"], "incomplete")
+        self.assertEqual(report["missing_candles"], 2)
+        self.assertEqual(report["gap_intervals"], 2)
+        self.assertEqual(report["first_12_gaps"][0]["start_ms"], 0)
+
+    def test_audit_duplicate_and_bad_ohlcv(self):
+        candle = [0, "10", "12", "9", "11", "100"]
+        report = coverage_report([candle, candle], "ETH-USD", 0, INTERVAL_MS, "coinbase")
+        self.assertEqual(report["duplicate_candles"], 1)
+        self.assertEqual(report["status"], "incomplete")
+        with self.assertRaises(ValueError):
+            coverage_report([[0, "10", "nan", "9", "11", "100"]],
+                            "ETH-USD", 0, INTERVAL_MS, "coinbase")
 
 
 if __name__ == "__main__":

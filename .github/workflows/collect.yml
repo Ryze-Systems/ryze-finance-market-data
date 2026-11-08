@@ -13,6 +13,11 @@ on:
         required: true
         default: '2024-01-09T00:00:00Z'
         type: string
+      audit_only:
+        description: Diagnose missing candles without producing tradeable datasets
+        required: true
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -37,7 +42,13 @@ jobs:
         env:
           START_UTC: ${{ inputs.start }}
           END_UTC: ${{ inputs.end }}
-        run: python collector.py --provider coinbase --start "$START_UTC" --end "$END_UTC" --output out
+          AUDIT_ONLY: ${{ inputs.audit_only }}
+        run: |
+          if [ "$AUDIT_ONLY" = "true" ]; then
+            python collector.py --provider coinbase --start "$START_UTC" --end "$END_UTC" --output out --audit-only
+          else
+            python collector.py --provider coinbase --start "$START_UTC" --end "$END_UTC" --output out
+          fi
       - uses: actions/upload-artifact@v4
         with:
           name: public-spot-4h-sample

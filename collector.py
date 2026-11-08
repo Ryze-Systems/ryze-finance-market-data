@@ -121,16 +121,74 @@ def collect(symbol: str, start_ms: int, end_ms: int, directory: pathlib.Path, pr
     return target
 
 
+def coverage_report(rows: list, symbol: str, start_ms: int, end_ms: int, provider: str = "coinbase") -> dict:
+    """Diagnose coverage without ever certifying a partial series as a dataset."""
+    if provider not in MARKETS or symbol not in MARKETS[provider] or start_ms >= end_ms:
+        raise ValueError("Invalid market/range")
+    if start_ms % INTERVAL_MS or end_ms % INTERVAL_MS:
+        raise ValueError("Non-4h UTC boundary")
+    if end_ms > int(time.time() * 1000) // INTERVAL_MS * INTERVAL_MS:
+        raise ValueError("Audit requires fully closed historical candles")
+    timestamps = []
+    for candle in rows:
+        if not isinstance(candle, (list, tuple)) or len(candle) < 6 or type(candle[0]) is not int:
+            raise ValueError("Malformed audit candle")
+        at = candle[0]
+        if at < start_ms or at >= end_ms or at % INTERVAL_MS:
+            raise ValueError("Out-of-range or misaligned audit candle")
+        # Every returned candle must be internally sound, even in diagnostic mode.
+        validate([candle], symbol, at, at + INTERVAL_MS, provider)
+        timestamps.append(at)
+    unique = sorted(set(timestamps))
+    missing = []
+    cursor = start_ms
+    for at in unique + [end_ms]:
+        if at > cursor:
+            missing.append({"start_ms": cursor, "end_ms": at, "candles": (at - cursor) // INTERVAL_MS})
+        cursor = at + INTERVAL_MS
+    count_missing = sum(gap["candles"] for gap in missing)
+    count_duplicate = len(timestamps) - len(unique)
+    canonical = json.dumps(rows, separators=(",", ":"), ensure_ascii=True).encode()
+    return {
+        "schema_version": 1,
+        "kind": "diagnostic_only_not_validated_market_data",
+        "provider": provider,
+        "symbol": symbol,
+        "start_ms": start_ms,
+        "end_ms": end_ms,
+        "expected_candles": (end_ms - start_ms) // INTERVAL_MS,
+        "returned_candles": len(timestamps),
+        "unique_candles": len(unique),
+        "missing_candles": count_missing,
+        "duplicate_candles": count_duplicate,
+        "gap_intervals": len(missing),
+        "first_12_gaps": missing[:12],
+        "raw_rows_sha256": hashlib.sha256(canonical).hexdigest(),
+        "status": "complete" if not count_missing and not count_duplicate else "incomplete",
+    }
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Public spot OHLCV collection only")
     parser.add_argument("--start", required=True, help="UTC ISO8601 at 4h boundary")
     parser.add_argument("--end", required=True, help="UTC ISO8601 exclusive at 4h boundary")
     parser.add_argument("--output", default="out")
     parser.add_argument("--provider", choices=MARKETS, default="coinbase")
+    parser.add_argument("--audit-only", action="store_true", help="write gap diagnostics only; no market datasets")
     arguments = parser.parse_args()
     start_ms, end_ms = as_ms(arguments.start), as_ms(arguments.end)
     for symbol in MARKETS[arguments.provider]:
-        print(collect(symbol, start_ms, end_ms, pathlib.Path(arguments.output), arguments.provider))
+        if arguments.audit_only:
+            # Diagnostic artifacts must never be loaded as certified OHLCV data.
+            report = coverage_report(download(symbol, start_ms, end_ms, arguments.provider), symbol, start_ms, end_ms, arguments.provider)
+            output = pathlib.Path(arguments.output)
+            output.mkdir(parents=True, exist_ok=True)
+            path = output / f"diagnostic-{arguments.provider}-{symbol}-{start_ms}-{end_ms}.json"
+            with path.open("x") as stream:
+                json.dump(report, stream, indent=2, sort_keys=True)
+            print(f"{path}: {report['status']} missing={report['missing_candles']}")
+        else:
+            print(collect(symbol, start_ms, end_ms, pathlib.Path(arguments.output), arguments.provider))
 
 
 if __name__ == "__main__":
