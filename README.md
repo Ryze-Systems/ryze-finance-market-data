@@ -12,4 +12,8 @@ The manual GitHub workflow accepts an explicit UTC `start` and `end` (exclusive)
 
 Example manual run: `python collector.py --provider coinbase --start 2024-01-01T00:00:00Z --end 2024-01-09T00:00:00Z --output out`
 
+On 2026-11-08, the long-range 2022-01-01 to 2026-11-01 GitHub run #3 rejected Coinbase BTC because the first expected timestamp (2022-01-01 00:00 UTC) was absent and the first returned timestamp was 04:00 UTC. This is **not** a certified complete history. The optional `--audit-only` command / workflow input gathers per-asset diagnostic JSON with total missing candles, duplicates, first twelve gap intervals, request range and source hash. Diagnostics are explicitly **not** market datasets: no trading or backtest is permitted to treat them as validated OHLCV. Missing candles are never synthesized or forward-filled by this collector.
+
+Example: `python collector.py --provider coinbase --start 2022-01-01T00:00:00Z --end 2026-11-01T00:00:00Z --output out --audit-only`
+
 Cloud automation is staged in a draft PR. Do not enable recurring runs until the free runner execution, artifact retention and operational budget have been verified, and merge has been explicitly approved.
