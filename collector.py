@@ -58,7 +58,12 @@ def download(symbol: str, start_ms: int, end_ms: int, provider: str = "binance")
     while cursor < end_ms:
         if provider == "coinbase":
             window_end = min(cursor + 300 * INTERVAL_MS, end_ms)
-            params = urllib.parse.urlencode({"start": cursor // 1000, "end": window_end // 1000, "granularity": "FOUR_HOUR", "limit": 300})
+            # Coinbase can include both the requested start and end candles.
+            # Requesting 300 bars with an exclusive end therefore asks for
+            # 301 bars and Coinbase truncates the OLDEST, silently dropping
+            # one 4h bar at every page boundary. Cap the requested inclusive
+            # end to the last desired candle and keep our exclusive filter.
+            params = urllib.parse.urlencode({"start": cursor // 1000, "end": (window_end - INTERVAL_MS) // 1000, "granularity": "FOUR_HOUR", "limit": 300})
             url = f"{COINBASE_URL}/{symbol}/candles?{params}"
         else:
             window_end = end_ms

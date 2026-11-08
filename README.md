@@ -14,6 +14,8 @@ Example manual run: `python collector.py --provider coinbase --start 2024-01-01T
 
 On 2026-11-08, the long-range 2022-01-01 to 2026-11-01 GitHub run #3 rejected Coinbase BTC because the first expected timestamp (2022-01-01 00:00 UTC) was absent and the first returned timestamp was 04:00 UTC. This is **not** a certified complete history. The optional `--audit-only` command / workflow input gathers per-asset diagnostic JSON with total missing candles, duplicates, first twelve gap intervals, request range and source hash. Diagnostics are explicitly **not** market datasets: no trading or backtest is permitted to treat them as validated OHLCV. Missing candles are never synthesized or forward-filled by this collector.
 
+Cloud diagnostic run #4 (`42485041728`) confirmed exactly **35 missing 4h candles per asset out of 10,590**, at identical timestamps spaced 300 candles apart. This is consistent with an off-by-one request limit (Coinbase returns 300 newest records from a 301-bar inclusive interval), *not* evidence of exchange downtime. The next patch narrows Coinbase request end time by one interval; it must still pass a fresh cloud historical run before this hypothesis can be considered proven.
+
 Example: `python collector.py --provider coinbase --start 2022-01-01T00:00:00Z --end 2026-11-01T00:00:00Z --output out --audit-only`
 
 Cloud automation is staged in a draft PR. Do not enable recurring runs until the free runner execution, artifact retention and operational budget have been verified, and merge has been explicitly approved.
