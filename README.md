@@ -19,3 +19,8 @@ Cloud diagnostic run #4 (`42485041728`) confirmed exactly **35 missing 4h candle
 Example: `python collector.py --provider coinbase --start 2022-01-01T00:00:00Z --end 2026-11-01T00:00:00Z --output out --audit-only`
 
 Cloud automation is staged in a draft PR. Do not enable recurring runs until the free runner execution, artifact retention and operational budget have been verified, and merge has been explicitly approved.
+
+
+## Independent Kraken recent source
+
+`kraken_recent.py` reads the unauthenticated Kraken public spot 240-minute OHLCV endpoint for XBTUSD, ETHUSD and SOLUSD; it rejects gaps, bad values and the live incomplete candle. JSONL and SHA256 sidecars are immutable, labelled `kraken_spot`. `.github/workflows/kraken-recent.yml` is manual-only, uses no secrets or broker connection, and retains evidence for one day. The REST endpoint returns only a limited recent sample: **it does not establish independent full-history completeness**. Cross-exchange prices can differ and require a quantified comparison before any dataset is deemed research-ready.
