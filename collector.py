@@ -127,6 +127,8 @@ def coverage_report(rows: list, symbol: str, start_ms: int, end_ms: int, provide
         raise ValueError("Invalid market/range")
     if start_ms % INTERVAL_MS or end_ms % INTERVAL_MS:
         raise ValueError("Non-4h UTC boundary")
+    if end_ms > int(time.time() * 1000) // INTERVAL_MS * INTERVAL_MS:
+        raise ValueError("Audit requires fully closed historical candles")
     timestamps = []
     for candle in rows:
         if not isinstance(candle, (list, tuple)) or len(candle) < 6 or type(candle[0]) is not int:
