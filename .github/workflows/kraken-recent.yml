@@ -2,6 +2,9 @@ name: Kraken independent recent spot sample
 
 on:
   workflow_dispatch:
+  schedule:
+    # Best-effort sampling shortly after each closed 4h UTC bar.
+    - cron: '17 */4 * * *'
 
 permissions:
   contents: read
